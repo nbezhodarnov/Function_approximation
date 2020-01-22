@@ -9,7 +9,7 @@ long double func(long double x) {
 
 int main()
 {
-    //std::cout << std::setprecision(33);
+    //std::cout << std::setprecision(33);/
     long double x[1000], f[1000];
     for (int i = 0; i < 1000; ++i) {
         x[i] = i * 0.01;
