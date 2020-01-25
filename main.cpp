@@ -1,5 +1,6 @@
 #include <tgmath.h>
 #include <iostream>
+#include <fstream>
 //#include <iomanip>
 
 long double func(long double x) {
@@ -9,46 +10,142 @@ long double func(long double x) {
 
 int main()
 {
-    //std::cout << std::setprecision(33);/
-    long double x[1000], f[1000];
-    for (int i = 0; i < 1000; ++i) {
-        x[i] = i * 0.01;
-        f[i] = func(x[i]);
+    //std::cout << std::setprecision(33);
+    char file_name[80];
+    std::cout << "Input name of file: ";
+    std::cin >> file_name;
+    std::ifstream file(file_name, std::ios::binary);
+
+    while (!file) {
+        std::cout << "File didn't open. Input name again: ";
+        std::cin >> file_name;
+        file.open(file_name, std::ios::binary);
     }
 
+    int n = 256, min = 0, min_local = 0;
+    long double x[n], step = 3.857;
+    unsigned char f[n];
 
+    file.read((char *) &f[0], 1);
+    for (int i = 0; i < n; ++i) {
+        x[i] = i * step;
+        file.read((char *) &f[i], 1);
+        if (f[i] < f[min]) {
+            min = i;
+        }
+        std::cout << i << ' ' << (int)f[i] << '\n';
+    }
+    std::cout << '\n';
+    file.close();
+    /*for (int i = 0; i < n; ++i) {
+        f[i] -= f[min];
+        std::cout << (int)f[i] << ' ';
+    }
+    std::cout << '\n';*/
 
-    int index = 100;
+    /*for (int i = min; f[i] > f[min] + 2; ++i) {
+
+    }*/
+    int start, end;
+    std::cout << "Input start: ";
+    std::cin >> start;
+    std::cout << "Input end: ";
+    std::cin >> end;
+    std::cout << '\n';
+    end++;
+    min_local = start;
+    for (int i = start + 1; i < end; ++i) {
+        if (f[i] < f[min_local]) {
+            min_local = i;
+        }
+    }
+    int coefficient = f[min_local];
+    for (int i = start; i < end; ++i) {
+        f[i] -= coefficient;
+    }
+
+    n = end - start;
+    int index = start + n / 10, peak_beginning;
+    bool is_peak_unavailable = false;
     long double a1, a2, b1, b2, c1, c2;
-    while ((((f[index + 1] - f[index]) / 0.001 >= 0.5) || ((f[index + 1] - f[index]) / 0.001 > (f[index + 2] - f[index + 1]) / 0.001)) && (f[index] < f[index + 1])) {
+    while (f[index] <= f[index + 1]) {
+        if (f[index] + coefficient == 128) {
+            if (f[index - 1] + coefficient < 128) {
+                peak_beginning = index;
+                is_peak_unavailable = true;
+            }
+        }
         index++;
+        if ((f[index + 1] + coefficient < 128) && (is_peak_unavailable)) {
+            index = (peak_beginning + index) / 2;
+            break;
+        }
     }
     c1 = x[index];
     a1 = f[index];
-    b1 = -log(f[index * 100 / 245] / a1) / (pow(x[index / 2] - c1, 2));
-    index = 900;
-    while ((((f[index - 1] - f[index]) / 0.001 >= 0.5) || ((f[index - 1] - f[index]) / 0.001 > (f[index - 2] - f[index - 1]) / 0.001)) && (f[index] < f[index - 1])) {
+    b1 = std::abs(-log(f[start + (index - start) * 100 / 245] / a1) / (pow(x[start + (index - start) * 100 / 245] - c1, 2)));
+
+    if (is_peak_unavailable) {
+        a1 += coefficient / 2;
+    }
+
+    index = int(start + n * 0.9);
+    is_peak_unavailable = false;
+    while (f[index] <= f[index - 1]) {
+        if (f[index] + coefficient == 128) {
+            if (f[index + 1] + coefficient < 128) {
+                peak_beginning = index;
+                is_peak_unavailable = true;
+            }
+        }
         index--;
+        if ((f[index - 1] + coefficient < 128) && (is_peak_unavailable)) {
+            index = (peak_beginning + index) / 2;
+            break;
+        }
     }
     c2 = x[index];
     a2 = f[index];
-    b2 = -log(f[index + (1000 - index) * 100 / 182] / a2) / (pow(x[index + (1000 - index) / 2] - c2, 2));
+    b2 = std::abs(-log(f[index + (n - index) * 100 / 182] / a2) / (pow(x[index + (n - index) * 100 / 182] - c2, 2)));
+
+    bool long_line = false;
+    if ((c1 > c2) && (!is_peak_unavailable)) {
+        long_line = true;
+        if (c1 - x[start] < x[end] - c2) {
+            int max_local = a1;
+            index = start + n / 10;
+            while ((max_local - f[index] > 4) || (f[index] < f[index + 1])) {
+                index++;
+            }
+            c1 = x[index];
+
+            index = int(start + n * 0.9);
+            while ((max_local - f[index] > 4) || (f[index] < f[index - 1])) {
+                index--;
+            }
+            c2 = x[index];
+        }
+    }
+
+    if (is_peak_unavailable) {
+        a2 += coefficient / 2;
+    }
 
     bool is_two_extremums = true;
-    if (std::abs(c1 - c2) <= 0.001) {
-        int index_temp = 999;
-        while ((f[index_temp - 1] - f[index_temp]) / 0.001 < 0.5) {
+    if (std::abs(c1 - c2) <= step) {
+        int index_temp = start + n;
+        while (f[index_temp - 1] < f[index_temp]) {
             index_temp--;
         }
-        while ((((f[index_temp - 1] - f[index_temp]) / 0.001 >= 0.5) || ((f[index_temp - 1] - f[index_temp]) / 0.001 > (f[index_temp - 2] - f[index_temp - 1]) / 0.001)) && (f[index_temp] < f[index_temp - 1]) && (index_temp > 900)) {
+        while ((f[index_temp] <= f[index_temp - 1]) && (index_temp > int(n * 0.9))) {
             index_temp--;
         }
-        if (index_temp <= 900) {
-            index_temp = 0;
-            while((f[index_temp + 1] - f[index_temp]) / 0.001 < 0.5) {
+        if (index_temp <= n * 0.9) {
+            index_temp = start;
+            while(f[index_temp + 1] < f[index_temp]) {
                 index_temp++;
             }
-            while ((((f[index_temp + 1] - f[index_temp]) / 0.001 >= 0.5) || ((f[index_temp + 1] - f[index_temp]) / 0.001 > (f[index_temp + 2] - f[index_temp + 1]) / 0.001)) && (f[index_temp] < f[index_temp + 1]) && (index_temp < 100)) {
+            while ((f[index_temp] <= f[index_temp + 1]) && (index_temp < n / 10)) {
                 index_temp++;
             }
             if (index_temp >= 100) {
@@ -56,15 +153,14 @@ int main()
             } else {
                 c1 = x[index_temp];
                 a1 = f[index_temp];
-                b1 = -log(f[index_temp / 2] / a1) / (pow(x[index_temp / 2] - c1, 2));
+                b1 = std::abs(-log(f[start + (index_temp - start) / 2] / a1) / (pow(x[start + (index_temp - start) / 2] - c1, 2)));
             }
         } else {
             c2 = x[index_temp];
             a2 = f[index_temp];
-            b2 = -log(f[index_temp + (1000 - index_temp) / 2] / a2) / (pow(x[index_temp + (1000 - index_temp) / 2] - c2, 2));
+            b2 = std::abs(-log(f[index_temp + (n - index_temp) / 2] / a2) / (pow(x[index_temp + (n - index_temp) / 2] - c2, 2)));
         }
     }
-
 
 
     std::cout << "a1 = " << a1 << ", b1 = " << b1 << ", c1 = " << c1 << '\n';
@@ -75,12 +171,11 @@ int main()
         a2 /= 2;
         std::cout << '\n';
     }
+    //return 0;
 
 
 
-
-
-    long double step1 = 0.5, step2 = 0.01, step3 = 0.1, min_value = INFINITY, temp;
+    long double step1 = 0.5, step2 = 0.01, step3 = 0.1, min_value = INFINITY, previous_value, temp;
     if ((a1 > 1000) || (a2 > 1000)) {
         step1 = 2;
         step3 = 0.05;
@@ -106,23 +201,41 @@ int main()
         step2 *= 2;
         step3 *= 2;
     }
-    int numbers_of_points = 50, counter = 0;
+    int numbers_of_points = n, counter = 0;
+    if (n < numbers_of_points) {
+        numbers_of_points = n;
+    }
+    if ((n > 150) && (!long_line)) {
+        numbers_of_points = 50;
+    }
     uint8_t min_point_indexes[6];
     for (uint8_t i = 0; i < 6; ++i) {
         min_point_indexes[i] = 0;
     }
-    bool q = true;
+    bool q = true, need_center_correction = false;
+    uint8_t center_correcter = 1;
+    int little_changes_count = 0;
+    long double reset[6];
     while (min_value > 0.01) {
     q = false;
+    previous_value = min_value;
     for (uint8_t i = 0; i < 5; ++i) {
         for (uint8_t j = 0; j < 5; ++j) {
             for (uint8_t k = 0; k < 5; ++k) {
                 for (uint8_t l = 0; l < 5; ++l) {
                     for (uint8_t m = 0; m < 5; ++m) {
-                        for (uint8_t n = 0; n < 5; ++n) {
+                        for (uint8_t r = 0; r < 5; ++r) {
                             temp = 0;
                             for (int p = 0; p < numbers_of_points; ++p) {
-                                temp += std::abs(f[p * 1000 / numbers_of_points] - (a1 - (2 - i) * step1) * exp(-(b1 - (2 - j) * step2) * pow(x[p * 1000 / numbers_of_points] - c1 + (2 - k) * step3, 2)) - (a2 - (2 - l) * step1) * exp(-(b2 - (2 - m) * step2) * pow(x[p * 1000 / numbers_of_points] - c2 + (2 - n) * step3, 2)));
+                                center_correcter = 1;
+                                if ((p > n * 0.25) && (p < n * 0.75)) {
+                                    if (need_center_correction) {
+                                        center_correcter = 8;
+                                    }
+                                }
+                                if (f[start + p * n / numbers_of_points] + coefficient < 128) {
+                                    temp += center_correcter * std::abs(f[start + p * (n / numbers_of_points)] - std::abs(a1 - (2 - i) * step1) * exp(-std::abs(b1 - (2 - j) * step2) * pow(x[start + p * (n / numbers_of_points)] - c1 + (2 - k) * step3, 2)) - std::abs(a2 - (2 - l) * step1) * exp(-std::abs(b2 - (2 - m) * step2) * pow(x[start + p * (n / numbers_of_points)] - c2 + (2 - r) * step3, 2)));
+                                }
                             }
                             if (temp < min_value) {
                                 q = true;
@@ -132,7 +245,7 @@ int main()
                                 min_point_indexes[2] = k;
                                 min_point_indexes[3] = l;
                                 min_point_indexes[4] = m;
-                                min_point_indexes[5] = n;
+                                min_point_indexes[5] = r;
                             }
                         }
                     }
@@ -144,6 +257,45 @@ int main()
         step1 /= 10;
         step2 /= 10;
         step3 /= 10;
+        if (step1 < 1e-20) {
+            step1 = 0.5;
+            step2 = 0.01;
+            step3 = 0.1;
+
+            if (((min_value > 160) && (!long_line)) || (min_value > 200)) {
+                temp = min_value + 301;
+                reset[0] = a1;
+                reset[1] = b1;
+                reset[2] = c1;
+                reset[3] = a2;
+                reset[4] = b2;
+                reset[5] = c2;
+                while (temp - min_value > 300) {
+                    a1 = reset[0] + (rand() % 100 - 50) / 1.0;
+                    b1 = reset[1] + (rand() % 10 - 5) / 10.0;
+                    c1 = reset[2] + (rand() % 10 - 5) / 1.0;
+                    a2 = reset[3] + (rand() % 100 - 50) / 1.0;
+                    b2 = reset[4] + (rand() % 10 - 5) / 10.0;
+                    c2 = reset[5] + (rand() % 10 - 5) / 1.0;
+
+                    temp = 0;
+                    for (int p = 0; p < numbers_of_points; ++p) {
+                        center_correcter = 1;
+                        if ((p > n * 0.25) && (p < n * 0.75)) {
+                            if (need_center_correction) {
+                                center_correcter = 8;
+                            }
+                        }
+                        if (f[start + p * n / numbers_of_points] + coefficient < 128) {
+                            temp += center_correcter * std::abs(f[start + p * (n / numbers_of_points)] - std::abs(a1) * exp(-std::abs(b1) * pow(x[start + p * (n / numbers_of_points)] - c1, 2)) - std::abs(a2) * exp(-std::abs(b2) * pow(x[start + p * (n / numbers_of_points)] - c2, 2)));
+                        }
+                    }
+                }
+            }
+
+            min_value = temp;
+            counter = 0;
+        }
         continue;
     }
     a1 -= (2 - min_point_indexes[0]) * step1;
@@ -152,6 +304,14 @@ int main()
     a2 -= (2 - min_point_indexes[3]) * step1;
     b2 -= (2 - min_point_indexes[4]) * step2;
     c2 -= (2 - min_point_indexes[5]) * step3;
+    if ((std::abs(previous_value - min_value) < 0.0001) && (((min_value > 160) && (!long_line)) || (min_value > 200))) {
+        little_changes_count++;
+        if (little_changes_count >= 10) {
+            break;
+        }
+    } else {
+        little_changes_count = 0;
+    }
     if ((min_point_indexes[0] % 4 != 0) && (min_point_indexes[1] % 4 != 0) && (min_point_indexes[2] % 4 != 0) && (min_point_indexes[3] % 4 != 0) && (min_point_indexes[4] % 4 != 0) && (min_point_indexes[5] % 4 != 0)) {
         step1 /= 10;
         step2 /= 10;
@@ -165,18 +325,56 @@ int main()
             step3 = 0.1 * (counter / 10);
             //counter = 0;
         }
-        if ((counter % 100 == 0) && (min_value > 0.5)) {
+        if ((counter % 100 == 0) && (min_value > 160)) {
             step1 = 0.5;
             step2 = 0.01;
             step3 = 0.1;
-            a1 += (rand() % 100 - 50) / 10.0;
-            b1 += (rand() % 10 - 5) / 100.0;
-            c1 += (rand() % 10 - 5) / 10.0;
-            a2 += (rand() % 100 - 50) / 10.0;
-            b2 += (rand() % 10 - 5) / 100.0;
-            c2 += (rand() % 10 - 5) / 10.0;
-            min_value = INFINITY;
+
+            temp = min_value + 301;
+            reset[0] = a1;
+            reset[1] = b1;
+            reset[2] = c1;
+            reset[3] = a2;
+            reset[4] = b2;
+            reset[5] = c2;
+            while (temp - min_value > 300) {
+                a1 = reset[0] + (rand() % 100 - 50) / 1.0;
+                b1 = reset[1] + (rand() % 10 - 5) / 10.0;
+                c1 = reset[2] + (rand() % 10 - 5) / 1.0;
+                a2 = reset[3] + (rand() % 100 - 50) / 1.0;
+                b2 = reset[4] + (rand() % 10 - 5) / 10.0;
+                c2 = reset[5] + (rand() % 10 - 5) / 1.0;
+
+                temp = 0;
+                for (int p = 0; p < numbers_of_points; ++p) {
+                    center_correcter = 1;
+                    if ((p > n * 0.25) && (p < n * 0.75)) {
+                        if (need_center_correction) {
+                            center_correcter = 8;
+                        }
+                    }
+                    if (f[start + p * n / numbers_of_points] + coefficient < 128) {
+                        temp += center_correcter * std::abs(f[start + p * (n / numbers_of_points)] - std::abs(a1) * exp(-std::abs(b1) * pow(x[start + p * (n / numbers_of_points)] - c1, 2)) - std::abs(a2) * exp(-std::abs(b2) * pow(x[start + p * (n / numbers_of_points)] - c2, 2)));
+                    }
+                }
+            }
+
+            min_value = temp;
             counter = 0;
+        }
+        temp = 0;
+        for (int p = 0; p < numbers_of_points; ++p) {
+            center_correcter = 0;
+            if ((p > n * 0.25) && (p < n * 0.75)) {
+                center_correcter = 8;
+            }
+            if (f[start + p * n / numbers_of_points] + coefficient < 128) {
+                temp += center_correcter * std::abs(f[start + p * (n / numbers_of_points)] - std::abs(a1) * exp(-std::abs(b1) * pow(x[start + p * (n / numbers_of_points)] - c1, 2)) - std::abs(a2) * exp(-std::abs(b2) * pow(x[start + p * (n / numbers_of_points)] - c2, 2)));
+            }
+        }
+        if ((min_value < 80) && (temp > 40)) {
+            need_center_correction = true;
+            min_value = INFINITY;
         }
     }
     std::cout << "a1 = " << a1 << ", b1 = " << b1 << ", c1 = " << c1 << '\n';
@@ -189,6 +387,11 @@ int main()
     std::cout << '\n' << step1 << ' ' << step2 << ' ' << step3 << '\n';
     std::cout << "\n\n";
     }
+
+    a1 = std::abs(a1);
+    a2 = std::abs(a2);
+    b1 = std::abs(b1);
+    b2 = std::abs(b2);
 
 
     std::cout << "a1 = " << a1 << ", b1 = " << b1 << ", c1 = " << c1 << '\n';
