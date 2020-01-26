@@ -16,17 +16,75 @@ int main()
     std::cin >> file_name;
     std::ifstream file(file_name, std::ios::binary);
 
-    while (!file) {
-        std::cout << "File didn't open. Input name again: ";
-        std::cin >> file_name;
-        file.open(file_name, std::ios::binary);
+    int experiments_count = 0, file_size;
+    while(experiments_count == 0) {
+        while (!file) {
+            std::cout << "File didn't open. Input name again: ";
+            std::cin >> file_name;
+            file.open(file_name, std::ios::binary);
+        }
+        file.seekg(0, std::ios::end);
+        file_size = (int)file.tellg() - 1;
+        file.seekg(0, std::ios::beg);
+        experiments_count = file_size / 768;
+        if (experiments_count == 0) {
+            std::cout << "There is an error in opening the file. Input name of another file: ";
+            std::cin >> file_name;
+            file.open(file_name, std::ios::binary);
+        }
     }
+    if (file_size % 768 > 0) {
+        experiments_count++;
+    }
+    int experiment_number = 0;
+    if (experiments_count > 1) {
+        while ((experiment_number < 1) || (experiment_number > experiments_count)) {
+            std::cout << "Input number of experiment from 1 to " << experiments_count << ": ";
+            std::cin >> experiment_number;
+        }
+    } else {
+        experiment_number = 1;
+    }
+    file.seekg(768 * (experiment_number - 1) + 257, std::ios::beg);
 
-    int n = 256, min = 0, min_local = 0;
+    int n = 256, min = 0, min_local = 0, input_number = 0, zero_check = 20;
     long double x[n], step = 3.857;
     unsigned char f[n];
 
-    file.read((char *) &f[0], 1);
+    for (uint8_t i = 0; i < 20; ++i) {
+        file.read((char *) &f[0], 1);
+        if ((f[0] != 63) && (f[0] != 0)) {
+            zero_check = i + 1;
+            break;
+        }
+    }
+    if ((f[0] == 63) || (f[0] == 0) || ((file.eof()) && (file_size % 768 > 0))) {
+        input_number = 1;
+    } else {
+        file.seekg(256 - zero_check, std::ios::cur);
+        for (uint8_t i = 0; i < 20; ++i) {
+            file.read((char *) &f[0], 1);
+            //std::cout << (int)f[0] << ' ';
+            if ((f[0] != 63) && (f[0] != 0)) {
+                break;
+            }
+        }
+        if ((f[0] == 63) || (f[0] == 0)  || ((file.eof()) && (file_size % 768 > 0))) {
+            input_number = 2;
+        } else {
+            input_number = 3;
+        }
+    }
+    if (input_number > 1) {
+        int input_number_temp = 0;
+        while ((input_number_temp < 1) || (input_number_temp > input_number)) {
+            std::cout << "Input number from 1 to " << input_number << ": ";
+            std::cin >> input_number_temp;
+        }
+        input_number = input_number_temp;
+    }
+    file.seekg(768 * (experiment_number - 1) + 1 + 256 * (input_number - 1), std::ios::beg);
+
     for (int i = 0; i < n; ++i) {
         x[i] = i * step;
         file.read((char *) &f[i], 1);
@@ -111,20 +169,18 @@ int main()
     bool long_line = false;
     if ((c1 > c2) && (!is_peak_unavailable)) {
         long_line = true;
-        if (c1 - x[start] < x[end] - c2) {
-            int max_local = a1;
-            index = start + n / 10;
-            while ((max_local - f[index] > 4) || (f[index] < f[index + 1])) {
-                index++;
-            }
-            c1 = x[index];
-
-            index = int(start + n * 0.9);
-            while ((max_local - f[index] > 4) || (f[index] < f[index - 1])) {
-                index--;
-            }
-            c2 = x[index];
+        int max_local = a1;
+        index = start + n / 10;
+        while ((max_local - f[index] > 4) || (f[index] < f[index + 1])) {
+            index++;
         }
+        c1 = x[index];
+
+        index = int(start + n * 0.9);
+        while ((max_local - f[index] > 4) || (f[index] < f[index - 1])) {
+            index--;
+        }
+        c2 = x[index];
     }
 
     if (is_peak_unavailable) {
@@ -207,6 +263,8 @@ int main()
     }
     if ((n > 150) && (!long_line)) {
         numbers_of_points = 50;
+    } else if (n > 150) {
+        numbers_of_points = 100;
     }
     uint8_t min_point_indexes[6];
     for (uint8_t i = 0; i < 6; ++i) {
@@ -216,7 +274,7 @@ int main()
     uint8_t center_correcter = 1;
     int little_changes_count = 0;
     long double reset[6];
-    while (min_value > 0.01) {
+    while (min_value > 18) {
     q = false;
     previous_value = min_value;
     for (uint8_t i = 0; i < 5; ++i) {
@@ -262,7 +320,7 @@ int main()
             step2 = 0.01;
             step3 = 0.1;
 
-            if (((min_value > 160) && (!long_line)) || (min_value > 200)) {
+            if (((min_value > 160) && (!long_line)) || ((long_line) && (min_value > 200))) {
                 temp = min_value + 301;
                 reset[0] = a1;
                 reset[1] = b1;
@@ -304,7 +362,7 @@ int main()
     a2 -= (2 - min_point_indexes[3]) * step1;
     b2 -= (2 - min_point_indexes[4]) * step2;
     c2 -= (2 - min_point_indexes[5]) * step3;
-    if ((std::abs(previous_value - min_value) < 0.0001) && (((min_value > 160) && (!long_line)) || (min_value > 200))) {
+    if ((std::abs(previous_value - min_value) < 0.0001) && (((min_value < 160) && (!long_line)) || ((long_line) && (min_value < 200)))) {
         little_changes_count++;
         if (little_changes_count >= 10) {
             break;
@@ -362,24 +420,26 @@ int main()
             min_value = temp;
             counter = 0;
         }
-        temp = 0;
+    }
+    temp = 0;
+    if (!need_center_correction) {
         for (int p = 0; p < numbers_of_points; ++p) {
             center_correcter = 0;
             if ((p > n * 0.25) && (p < n * 0.75)) {
-                center_correcter = 8;
+                center_correcter = 1;
             }
             if (f[start + p * n / numbers_of_points] + coefficient < 128) {
                 temp += center_correcter * std::abs(f[start + p * (n / numbers_of_points)] - std::abs(a1) * exp(-std::abs(b1) * pow(x[start + p * (n / numbers_of_points)] - c1, 2)) - std::abs(a2) * exp(-std::abs(b2) * pow(x[start + p * (n / numbers_of_points)] - c2, 2)));
             }
         }
-        if ((min_value < 80) && (temp > 40)) {
+        if ((min_value < 80) && (temp > 50)) {
             need_center_correction = true;
             min_value = INFINITY;
         }
     }
     std::cout << "a1 = " << a1 << ", b1 = " << b1 << ", c1 = " << c1 << '\n';
     std::cout << "a2 = " << a2 << ", b2 = " << b2 << ", c2 = " << c2 << '\n';
-    std::cout << min_value << '\n';
+    std::cout << min_value << ' ' << previous_value << '\n';
 
     for (uint8_t i = 0; i < 6; ++i) {
         std::cout << (int)min_point_indexes[i] << ' ';
